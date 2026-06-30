@@ -1,0 +1,10 @@
+# Ignore specific folders 
+notUsed/
+asyncPCDLoader/
+
+# Ignore specific files
+calculateHole(new).js
+calculateOverlap(new).js
+staticLoader.js
+staticLoader copy.js
+varyingPointSize(static).js
