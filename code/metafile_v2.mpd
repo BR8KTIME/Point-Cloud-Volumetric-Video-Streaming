@@ -1,0 +1,69 @@
+<?xml version="1.0"?>
+
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011"
+     type="static"
+     mediaPresentationDuration="PT25S"
+     profiles="urn:mpeg:dash:profile:isoff-on-demand:2011">
+
+  <ProgramInformation>
+    <Title>Point Cloud Objects</Title>
+  </ProgramInformation>
+
+
+  <Period id="longdress" duration="300">
+    <AdaptationSet id="Post_Processing_10" contentType="pointCloudVideo">
+      <SegmentTemplate frameRate="10" media="sequence/frame$Number%04d$/$RepresentationID$.drc"/>
+      <Representation id="LOD0"  bandwidth="17600000"   pointSize="8.5"/>
+      <Representation id="LOD1"  bandwidth="32800000"   pointSize="7.0"/>
+      <Representation id="LOD2"  bandwidth="46400000"   pointSize="5.5"/>
+      <Representation id="LOD3"  bandwidth="60000000"   pointSize="5.0"/>
+      <Representation id="LOD4"  bandwidth="73600000"   pointSize="4.5"/>
+      <Representation id="LOD5"  bandwidth="84000000"   pointSize="4.0"/>
+      <Representation id="LOD6"  bandwidth="96800000"   pointSize="4.0"/>
+      <Representation id="LOD7"  bandwidth="108800000"  pointSize="4.0"/>
+      <Representation id="LOD8"  bandwidth="120800000"  pointSize="4.0"/>
+      <Representation id="LOD9"  bandwidth="132800000"  pointSize="4.0"/>
+      <Representation id="LOD10" bandwidth="144000000"  pointSize="4.0"/>
+      <Representation id="LOD11" bandwidth="156000000"  pointSize="4.0"/>
+      <Representation id="LOD12" bandwidth="167200000"  pointSize="4.0"/>
+      <Representation id="LOD13" bandwidth="178400000"  pointSize="4.0"/>
+      <Representation id="LOD14" bandwidth="189600000"  pointSize="4.0"/>
+    </AdaptationSet>
+    <AdaptationSet id="Post_Processing_15" contentType="pointCloudVideo">
+      <SegmentTemplate frameRate="15" media="sequence/frame$Number%04d$/$RepresentationID$.drc"/>
+      <Representation id="LOD0"  bandwidth="26400000"   pointSize="8.5"/>
+      <Representation id="LOD1"  bandwidth="49200000"   pointSize="7.0"/>
+      <Representation id="LOD2"  bandwidth="69600000"   pointSize="5.5"/>
+      <Representation id="LOD3"  bandwidth="90000000"   pointSize="5.0"/>
+      <Representation id="LOD4"  bandwidth="110400000"  pointSize="4.5"/>
+      <Representation id="LOD5"  bandwidth="126000000"  pointSize="4.0"/>
+      <Representation id="LOD6"  bandwidth="145200000"  pointSize="4.0"/>
+      <Representation id="LOD7"  bandwidth="163200000"  pointSize="4.0"/>
+      <Representation id="LOD8"  bandwidth="181200000"  pointSize="4.0"/>
+      <Representation id="LOD9"  bandwidth="199200000"  pointSize="4.0"/>
+      <Representation id="LOD10" bandwidth="216000000"  pointSize="4.0"/>
+      <Representation id="LOD11" bandwidth="234000000"  pointSize="4.0"/>
+      <Representation id="LOD12" bandwidth="250800000"  pointSize="4.0"/>
+      <Representation id="LOD13" bandwidth="267600000"  pointSize="4.0"/>
+      <Representation id="LOD14" bandwidth="280400000"  pointSize="4.0"/>
+    </AdaptationSet>
+    <AdaptationSet id="Post_Processing_30" contentType="pointCloudVideo">
+      <SegmentTemplate frameRate="30" media="sequence/frame$Number%04d$/$RepresentationID$.drc"/>
+      <Representation id="LOD0"  bandwidth="52800000"   pointSize="8.5"/>
+      <Representation id="LOD1"  bandwidth="98400000"   pointSize="7.0"/>
+      <Representation id="LOD2"  bandwidth="139200000"  pointSize="5.5"/>
+      <Representation id="LOD3"  bandwidth="180000000"  pointSize="5.0"/>
+      <Representation id="LOD4"  bandwidth="220800000"  pointSize="4.5"/>
+      <Representation id="LOD5"  bandwidth="252000000"  pointSize="4.0"/>
+      <Representation id="LOD6"  bandwidth="290400000"  pointSize="4.0"/>
+      <Representation id="LOD7"  bandwidth="326400000"  pointSize="4.0"/>
+      <Representation id="LOD8"  bandwidth="362400000"  pointSize="4.0"/>
+      <Representation id="LOD9"  bandwidth="398400000"  pointSize="4.0"/>
+      <Representation id="LOD10" bandwidth="432000000"  pointSize="4.0"/>
+      <Representation id="LOD11" bandwidth="468000000"  pointSize="4.0"/>
+      <Representation id="LOD12" bandwidth="501600000"  pointSize="4.0"/>
+      <Representation id="LOD13" bandwidth="535200000"  pointSize="4.0"/>
+      <Representation id="LOD14" bandwidth="568800000"  pointSize="4.0"/>
+    </AdaptationSet>
+  </Period>
+</MPD>

@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <title>PCD File Rendering</title>
+    <style>
+        body { margin: 0; }
+        canvas { display: block; }
+        .info {
+            position: absolute;
+            top: 10px;
+            left: 100px;
+            padding: 10px;
+            background-color: rgba(0, 0, 0, 1);
+            color: white;
+            font-family: Arial, sans-serif;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div id="frameDisplay" class="info" style="top: 50px; font-size: 40px">Full Point Cloud</div>
+    <canvas id="webglCanvas"></canvas>
+    <!-- <div id="cameraDisplay" class="info" style="top: 100px;">Camera Position: x=0.00, y=0.00, z=0.00</div> -->
+    <script type="module" src="staticLoader.js"></script>
+</body>
+</html>
