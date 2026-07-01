@@ -13,7 +13,9 @@
 Volumetric Video, also known as the next generation media, allows users to experience 6-Degrees of Freedom (DoF), thereby providing a true immersive experience compared to the traditional 2D videos. The downside of these videos is the large data size which is highly unlikely to be supported by the current network infrastructure. In order to overcome this, we propose this system to enhance the user's Quality of Experience (QoE) under the given network. 
 
 ### Built With
-* [![Node.js][WebGL]][Three.js]
+* [![Node.js]]
+* [![Three.js]]
+* [![WebGL]]
 
 <!-- GETTING STARTED -->
 ## Getting Started
