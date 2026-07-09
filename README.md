@@ -11,9 +11,10 @@ Here are key ideas of this project:
 * Adopts 2D interpolation technique at the client side to decect occuring holes and conceal them to enhance the final visual quality.
 
 ### System Architecture
+![Architecture][architecturImage]
 
 ### Results
-[![Example][exampleURL]]
+![Example][exampleImage]
 
 ### Built With
 * ![Node.js]
@@ -56,4 +57,6 @@ Hasung Cho - lifeofcho23@gmail.com
 [Node.js]:https://img.shields.io/badge/node.js-000000?style=for-the-badge&logo=nodedotjs 
 [Three.js]: https://img.shields.io/badge/Three.js-black?style=for-the-badge&logo=threedotjs
 [WebGL]: https://img.shields.io/badge/WebGL-black?style=for-the-badge&logo=webgl
-[exampleURL]: src/images/example.png
+[exampleImage]: src/images/example.png
+[architectureImage]: src/images/architecture.png
+
