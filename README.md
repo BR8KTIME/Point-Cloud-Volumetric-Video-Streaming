@@ -14,7 +14,7 @@ Here are key ideas of this project:
 <img src="src/images/architecture.png" alt="Architecture" height="50%" width="50%">
 
 ### Results
-<img src="src/images/example.png" alt="Architecture" height="50%" width="50%">
+<img src="src/images/example.png" alt="example" height="50%" width="50%">
 
 ### Built With
 * ![Node.js]
