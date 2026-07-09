@@ -56,4 +56,4 @@ Hasung Cho - lifeofcho23@gmail.com
 [Node.js]:https://img.shields.io/badge/node.js-000000?style=for-the-badge&logo=nodedotjs 
 [Three.js]: https://img.shields.io/badge/Three.js-black?style=for-the-badge&logo=threedotjs
 [WebGL]: https://img.shields.io/badge/WebGL-black?style=for-the-badge&logo=webgl
-[exampleURL]: images/example.png
+[exampleURL]: src/images/example.png
