@@ -11,7 +11,7 @@ Here are key ideas of this project:
 * Adopts 2D interpolation technique at the client side to decect occuring holes and conceal them to enhance the final visual quality.
 
 ### System Architecture
-<img src="src/images/architecture.png" alt="Architecture" height="50%" width="50%">
+<img src="src/images/architecture.png" alt="Architecture" height="80%" width="80%">
 
 ### Results
 <img src="src/images/example.png" alt="example" height="50%" width="50%">
