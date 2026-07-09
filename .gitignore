@@ -1,6 +1,7 @@
 # Ignore specific folders 
 notUsed/
 asyncPCDLoader/
+node_modules/
 
 # Ignore specific files
 calculateHole(new).js
@@ -10,3 +11,7 @@ staticLoader copy.js
 varyingPointSize(static).js
 simulation.js
 metafileDefense.xml
+package-lock.json
+package.json
+.gitignore
+
