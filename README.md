@@ -94,7 +94,10 @@ If you have raw point cloud sequences (e.g., 8i / Microsoft Voxelized Upper Bodi
 #### 3. Serving Datasets Locally
 Run an HTTP server with CORS enabled inside your dataset root directory:
 ```bash
-# Inside <dataset_root>
+# Option A: Using Node.js (Recommended, no Python required)
+npx http-server -p 8080 --cors
+
+# Option B: Using Python
 python -m http.server 8080 --cors
 ```
 
