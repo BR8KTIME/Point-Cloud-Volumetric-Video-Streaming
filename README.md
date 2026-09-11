@@ -12,11 +12,7 @@ Here are key ideas of this project:
 
 ### Repository Structure
 * **`src/`**: Real-time adaptive volumetric video streaming web client powered by MPEG-DASH, Three.js, and custom WebGL shaders (`stream.js`).
-* **`offline_research/`**:
-  * `create_LoD/`: C++ PCL Octree-based voxelization and LoD generation pipeline with Linux Traffic Control (`tc`) network fluctuation testbeds.
-  * `offline_experiments/`: Hole vs. Overlap trade-off measurement and optimal point size determination scripts.
-  * `optimization_datasets/`: Precomputed optimal point size metadata (`optimal.txt`) across varying bandwidth alpha factors.
-  * `testing_and_legacy/`: Static models, bulk loaders, and legacy test scripts.
+* **`offline_research/create_LoD/`**: C++ PCL Octree-based voxelization and Draco compression pipeline for generating multi-level LoD point cloud sequences.
 
 ### System Architecture
 <img src="src/images/architecture.png" alt="Architecture" height="90%" width="90%">
@@ -32,27 +28,25 @@ Here are key ideas of this project:
 <!-- GETTING STARTED -->
 ## Getting Started
 
-Here are some steps to get ready and run the proposed streaming system. 
+Here are steps to set up and run the streaming client.
 
 ### Prerequisites
 
-You need the following installed on your machine: 
-* **Node.js**
+* **Node.js** (v18+ recommended)
 * **npm** (comes with Node.js)
 
 ### Installation
 
-1. Clone or download this repository to your local machine. 
-2. Open a Node.js terminal in the root folder of the project and install the required dependencies:
+1. Clone this repository to your local machine.
+2. Install the required client dependencies:
    ```bash
    npm install
    ```
 
-### Dataset Configuration & Preprocessing Pipeline
-Due to the large storage footprint of volumetric video sequences (multi-gigabytes per sequence across multiple LoDs), point cloud datasets are preprocessed and served via an external HTTP media server.
+### Dataset Structure & LoD Generation
 
-#### 1. Expected Dataset Hierarchy
-The streaming client expects Draco-compressed point cloud frames (`.drc`) structured according to `src/metafile.mpd`:
+The streaming client requests Draco-compressed point cloud frames (`.drc`) structured according to `src/metafile.mpd`:
+
 ```text
 <dataset_root>/
 └── longdress/                       # period.id specified in metafile.mpd
@@ -63,50 +57,26 @@ The streaming client expects Draco-compressed point cloud frames (`.drc`) struct
         │   └── ...
         │   └── LOD14.drc            # Highest quality (highest bandwidth, fine point size)
         ├── frame0001/
-        │   ├── LOD0.drc
-        │   └── ...
         └── ...
 ```
 
-#### 2. Generating LoD Datasets (`offline_research/create_LoD/`)
-If you have raw point cloud sequences (e.g., 8i / Microsoft Voxelized Upper Bodies sequences in `.ply` format), you can generate the required LoD hierarchy and Draco files using the provided pipeline:
+To generate this LoD dataset from raw `.ply` sequences, use the pipeline in `offline_research/create_LoD/`:
+1. **Octree LoD Division (`divide/`)**:
+   ```bash
+   cd offline_research/create_LoD/divide
+   mkdir -p build && cd build && cmake .. && make && cd ..
+   ./divide.sh <input_ply_directory> <output_lod_directory>
+   ```
+2. **Draco Compression (`changeFormat/`)**:
+   ```bash
+   cd ../changeFormat
+   ./ply2dracov2.sh <output_lod_directory> <target_dataset_path>
+   ```
 
-* **Step A: Octree-based LoD Division (`divide/`)**
-  Uses C++ Point Cloud Library (PCL) Octree voxel search (`pcl::octree::OctreePointCloudSearch`) to divide each raw frame into hierarchical LoD layers:
-  ```bash
-  cd offline_research/create_LoD/divide
-  mkdir -p build && cd build
-  cmake ..
-  make
-  cd ..
-  # Usage: ./divide.sh <input_ply_directory> <output_directory>
-  ./divide.sh /path/to/raw_ply_frames /path/to/output_lod_ply
-  ```
-
-* **Step B: Draco Point Cloud Compression (`changeFormat/`)**
-  Encodes the subdivided `.ply` files into compressed `.drc` files using Google Draco:
-  ```bash
-  cd ../changeFormat
-  # Update DRACO_ENCODER_PATH in ply2dracov2.sh if needed
-  ./ply2dracov2.sh /path/to/output_lod_ply /path/to/dataset/longdress/sequence
-  ```
-
-#### 3. Serving Datasets Locally
-Run an HTTP server with CORS enabled inside your dataset root directory:
-```bash
-# Option A: Using Node.js (Recommended, no Python required)
-npx http-server -p 8080 --cors
-
-# Option B: Using Python
-python -m http.server 8080 --cors
-```
-
-#### 4. Configure Endpoint
-Ensure `src/stream.js` points to your HTTP media server:
-```javascript
-// src/stream.js (Line 324)
-const baseUrl = 'http://localhost:8080/dataset/' + period.id + '/';
-```
+> Set your media server URL in `src/stream.js`:
+> ```javascript
+> const baseUrl = 'http://localhost:8080/dataset/' + period.id + '/';
+> ```
 
 ### Running the Project
 
