@@ -1,19 +1,19 @@
 import * as THREE from 'three';
 
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { discardWithNormals, addDepth } from './modules/customshader.js';
-import { euclideanDistance2D, computeIQR, createHistogram, otsuThreshold, calculateBins, getThreshold, getAverage, getRMSE } from './modules/utility.js';
+import { discardWithNormals, addDepth } from '../modules/customshader.js';
+import { euclideanDistance2D, computeIQR, createHistogram, otsuThreshold, calculateBins, getThreshold, getAverage, getRMSE } from '../modules/utility.js';
 
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
-import { parseMPD } from './modules/MPDParser.js';
-import { deltaE } from './modules/LabSpace.js';
+import { parseMPD } from '../modules/MPDParser.js';
+import { deltaE } from '../modules/LabSpace.js';
 
 
 // For rendering
 let isPlaying = false, loop = 0;
 let currentPlaybackFrame = 0, currentAngle = 0;
 let currentPoints, totalFrames = 0, frameHoldDuration = 0, frameHoldCounter = 1;
-let maxLoop = 0, loopFinished = false;
+let maxLoop = 0;
 
 //For Initilization
 let devicePixelRatio = window.devicePixelRatio;
@@ -35,8 +35,7 @@ let minScreenX = Number.MAX_SAFE_INTEGER, minScreenY = Number.MAX_SAFE_INTEGER;
 let maxScreenX = 0, maxScreenY = 0;
 
 //For time measuring
-let start = false;
-let startTime, endTime;
+let startTime, endTime, previous = 0;
 let targetFrameRate = 30, then = 0;
 let desiredInterval = (1 / targetFrameRate);
 
@@ -52,14 +51,14 @@ let previousFrameRate = 0;
 
 
 //For Buffers
-let playbackLogsLoadFrames = [];
-let playbackLogsRender = [];
-
+let totalStallDuration = 0; // In milliseconds
+let stallCount = 0;
+let playbackLogs = [];
 let segmentDuration = 1;
 let minimumPlayback = segmentDuration * 2;
 let GOFQueue = [];              // A queue of complete, sorted GOFs. E.g., [[GOF 1], [GOF 2], ...]
 let	currentPlayingGOF = [];     // The GOF being rendered right now. E.g., [frame 0, frame 1, ...]
-let consumedData = 0, receivedData = 0;
+
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
@@ -218,7 +217,7 @@ function bufferMargin()
 		return Math.max(penaltyValue, -segmentDuration / 2);
 }
 
-function timeConstraint(predictedBandwidth, temporalLOD, spatialLOD, isFirstGOF, verbose)
+function timeConstraint(predictedBandwidth, temporalLOD, spatialLOD, verbose)
 {
 	let segmentBandwidth = bitrateInfo.get(temporalLOD)[spatialLOD];
 	let requiredBandwidth = segmentBandwidth * segmentDuration;
@@ -226,10 +225,10 @@ function timeConstraint(predictedBandwidth, temporalLOD, spatialLOD, isFirstGOF,
 	let downloadTime = requiredBandwidth / predictedBandwidth;
 	let timeThreshold = 0;
 
-	if(isFirstGOF == true)
+	if(isRebuffering == true)
 		timeThreshold = segmentDuration;
-	// else if(getRemainingPlayBack() == 0)
-	// 	timeThreshold = segmentDuration;
+	else if(getRemainingPlayBack() == 0)
+		timeThreshold = segmentDuration;
 	else	
 		timeThreshold = segmentDuration + bufferMargin();
 
@@ -253,7 +252,7 @@ function timeConstraint(predictedBandwidth, temporalLOD, spatialLOD, isFirstGOF,
 	}
 }
 
-function selectQuality(adaptationSets, predictedBandwidth, isFirstGOF) {
+function selectQuality(adaptationSets, predictedBandwidth) {
 	
 	let maxObjectiveValue = 0;
 	let maxSpatialLOD = 0, maxTemporalLOD = 0;
@@ -269,13 +268,13 @@ function selectQuality(adaptationSets, predictedBandwidth, isFirstGOF) {
 			let temporalLOD = temporalLODs[temporalIdx];
 			let spatialLOD = spatialLODs[spatialIdx];
 			
-			let pass = timeConstraint(predictedBandwidth, temporalLOD, spatialLOD, isFirstGOF, verbose);
+			let pass = timeConstraint(predictedBandwidth, temporalLOD, spatialLOD, verbose);
 			verbose = false;
-			let alpha = 0.7;
-			
+			let alpha = 0.65;
 			if(pass)
 			{
 				let objectiveValue = schedulingObjectiveFunction(spatialLOD, temporalLOD, temporalLODs[temporalLODs.length-1], alpha);
+				// console.log(`Frame Rate: ${temporalLOD}, Spaital LOD: ${spatialLOD}, Objective Value: ${objectiveValue}`);
 				
 				if(objectiveValue > maxObjectiveValue)
 				{
@@ -283,22 +282,18 @@ function selectQuality(adaptationSets, predictedBandwidth, isFirstGOF) {
 					maxTemporalLOD = temporalLOD;
 					maxObjectiveValue = objectiveValue;
 				}
-				if((objectiveValue > moderateObjectiveValue) && (temporalLOD == 15))
-				{
+				if(objectiveValue > moderateObjectiveValue && temporalLOD == 15)
 					moderateSpatialLOD = spatialLOD;
-					moderateObjectiveValue = objectiveValue;
-				}
 			}
 		}
 	}
 
 	if((previousFrameRate == 30 && maxTemporalLOD == 10) || (previousFrameRate == 10 && maxTemporalLOD == 30))
 	{
-		console.log(`Original Pair --> Frame Rate ${maxTemporalLOD}, Best LOD ${maxSpatialLOD}, Objective Value ${maxObjectiveValue}`);
+		console.log(`Original Pair --> Frame Rate ${maxTemporalLOD}, Best LOD ${maxSpatialLOD}`);
 		maxTemporalLOD = 15;
 		maxSpatialLOD = moderateSpatialLOD;
-		maxObjectiveValue = moderateObjectiveValue;
-		console.log(`Current Pair --> Frame Rate ${maxTemporalLOD}, Best LOD ${maxSpatialLOD}, Objective Value ${maxObjectiveValue}`);
+		console.log(`Current Pair --> Frame Rate ${maxTemporalLOD}, Best LOD ${maxSpatialLOD}`);
 	}
 	if(maxTemporalLOD == 0)
 		maxTemporalLOD = 10;
@@ -312,15 +307,17 @@ function selectQuality(adaptationSets, predictedBandwidth, isFirstGOF) {
 	return [selectedAdaptation, maxSpatialLOD, maxObjectiveValue];
 }
 
+// const idealBandwidth = [264504620.3, 230849191.8, 243499069.3, 251226646.6, 270234550.2, 114001547.5, 95485401.8, 93631242.5, 95242336.63, 93481704.09, 95621617.42, 93770128.09, 119005327.6, 126150680.3, 134526390.6, 122569015.7, 143618997.5, 140472718.6, 142841869.2, 174848711.9, 167652777.4, 184126334.4, 148032461.6, 159130186.8, 144611729.7, 167731978.9, 165490144.5, 150389823.2, 165096810.3, 182313288.6];
 
 async function loadFrames() {
 
-	const MPDURL = '/metafile.mpd';
+	startTime = performance.now();
+
+	const MPDURL = '/metafile_v2.mpd';
 
 	const {period, adaptationSets} = await loadMPD(MPDURL, "longdress");
 
-	// Replace with your dataset server URL (e.g., http://localhost:8080 or remote server)
-	const baseUrl = 'http://localhost:8080/dataset/' + period.id + '/';
+	const baseUrl = 'http://141.223.65.28/dataset/' + period.id + '/';
 
 	//Select 10 frame rate, LOD 0 to begin with
 	let selectedAdaptation = adaptationSets[0];
@@ -334,12 +331,13 @@ async function loadFrames() {
 	
 	totalFrames = 300;
 
-	let actualBandwidth = 0, lastError = 0, lastActualBW = 0, predictedBandwidth = 180000000, constant = 10000000;
+	let actualBandwidth = 0, lastError = 0, lastActualBW = 0, predictedBandwidth = 200000000, constant = 10000000;
 	let segmentSize = targetFrameRate * segmentDuration;
-
+	
 	let frameIndex = 0;
+	let bufferEndTime = 0;
 	let idealIdx = 0;
-
+	
 	while(frameIndex < totalFrames) {
 		const promises = [];
 
@@ -349,7 +347,7 @@ async function loadFrames() {
 			predictedBandwidth = 0.85 * lastActualBW + 0.2 * lastError + constant;
 
 		let totalQuality = 0;
-		[selectedAdaptation, spatialLOD, totalQuality] = selectQuality(adaptationSets, predictedBandwidth, isFirstGOF);
+		[selectedAdaptation, spatialLOD, totalQuality] = selectQuality(adaptationSets, predictedBandwidth);
 		// [selectedAdaptation, spatialLOD, totalQuality] = selectQuality(adaptationSets, idealBandwidth[idealIdx]);
 		idealIdx++;
 		template = selectedAdaptation.SegmentTemplate;	
@@ -386,9 +384,8 @@ async function loadFrames() {
                 		latestDownloadEndTime = now;
             		}
 					
-					const frameSize = buffer.byteLength;
-					totalBytesDownloaded += frameSize;
-					return loadModel(buffer, tempIndex, pointSize, frameSize);
+					totalBytesDownloaded += buffer.byteLength;
+					return loadModel(buffer, tempIndex, pointSize, label);
 				})
 				.catch(error => {
 					console.error(`Error fetching or decoding frame #${segmentIndex}:`, error);
@@ -411,39 +408,73 @@ async function loadFrames() {
 		const currentError = actualBandwidth - predictedBandwidth;
 		lastActualBW = actualBandwidth;
 		lastError = currentError;
-		receivedData += totalBytesDownloaded;
-
+		
 		console.log(`🧪 Predicted Bandwidth ${(predictedBandwidth / 1000000).toFixed(2)} Mbps`);
-		console.log(`🧪 Calculated Bandwidth ${(actualBandwidth / 1000000).toFixed(2)} Mbps`);	
+		console.log(`🧪 Calculated Bandwidth ${(actualBandwidth / 1000000).toFixed(2)} Mbps`);
 
-		let passedTime = performance.now() - startTime;
-
-		playbackLogsLoadFrames.push({
-			time: passedTime / 1000, 
+		const timeNow = performance.now();
+				
+    	
+		if (getRemainingPlayBack() == 0) { // Not triggered
+        	// Only count it as a "network stall" if we were supposed to be playing
+        	if (isPlaying) {
+				const currentStall = timeNow - bufferEndTime;
+				totalStallDuration += currentStall;
+				stallCount++;
+				console.log(`⚠️ Buffer Empty! Stalled for ${currentStall.toFixed(0)}ms`);
+				isRebuffering = true;
+				isPlaying = false; 
+			}
+        	// Reset the timeline to NOW. We can't have buffer in the past.
+        	bufferEndTime = timeNow; 
+    	}
+		
+		let currentGOFLength = 0;
+		if(currentPlayingGOF.frames?.length > 0)
+			currentGOFLength = currentPlayingGOF.frames.length - currentPlaybackFrame;
+		
+		// 6. LOGGING & NEXT LOOP
+		playbackLogs.push({
+			time: Math.round(timeNow), 
+			remaingTimeBuffer: Math.round(getRemainingPlayBack(true) * 100) / 100,
 			actualBandwidth: actualBandwidth,
 			predictedBandwidth: predictedBandwidth,
-			requestedData: Math.round((totalBytesDownloaded / 1000000) * 100) / 100,
+			size: Math.round(getPlaybackBufferSize() * 100) / 100,
+			downloadedData: Math.round((totalBytesDownloaded / 1000000) * 100) / 100,
+			GOFQueue: GOFQueue.length,
+			currentGOF: currentGOFLength,
 			totalQuality: Math.round(totalQuality * 1000) / 1000
 		});
-			
+		
 		GOFQueue.push({frames: downloadedFrames, rate: frameRate, size: totalBytesDownloaded});
-		console.log(`🍷 GOF starting at frame ${frameIndex} loaded. Queue Size: ${GOFQueue.length} Segment Available`);	
-		startPlayback();
-
-		if(frameIndex == 0 && loop == 0)
-			start = true;
+		console.log(`🍷 GOF starting at frame ${frameIndex} loaded. Queue Size: ${GOFQueue.length} Segment Available`);
+		bufferEndTime = timeNow + getRemainingPlayBack() * 1000;
+		
+		// Check if the buffer has minimum play back if not add on the stalls 
+		const isLastGOF = (frameIndex + segmentSize >= totalFrames);
+		// 5. RESUME LOGIC (The "Wait" Logic)
+		// If we are stopped/rebuffering, check if we have enough data to start again
+		if (isRebuffering || !isPlaying) {
+			if (getRemainingPlayBack() >= minimumPlayback) {	
+				console.log(`🚀 Buffer refilled to ${getRemainingPlayBack().toFixed(2)}s. Resuming Playback!`);
+				startPlayback(); 
+				isRebuffering = false;
+				bufferEndTime = performance.now() + getRemainingPlayBack() * 1000;
+			}	
+			else if(isLastGOF){
+				startPlayback();
+				isRebuffering = false;
+			} else {
+				console.log(`⏳ Buffering... ${getRemainingPlayBack().toFixed(2)}s / ${minimumPlayback}s`);
+			}
+		}
 
 		maxLoop = 2;
 		frameIndex += segmentSize;
-
 		if(frameIndex >= totalFrames && loop < maxLoop)
 		{
 			frameIndex = 0;
 			loop += 1;
-		}
-		else if(frameIndex >= totalFrames && loop == maxLoop)
-		{
-			loopFinished = true;
 		}
     }
 }
@@ -452,11 +483,11 @@ async function loadFrames() {
 
 // 	startTime = performance.now();
 
-// 	const MPDURL = '/metafile.mpd';
-// 
+// 	const MPDURL = '/metafile_v2.mpd';
+
 // 	const {period, adaptationSets} = await loadMPD(MPDURL, "longdress");
-// 
-// 	const baseUrl = 'http://localhost:8080/dataset/' + period.id + '/';
+
+// 	const baseUrl = 'http://141.223.65.28/dataset/' + period.id + '/';
 
 // 	//Select 10 frame rate, LOD 0 to begin with
 // 	let selectedAdaptation = adaptationSets[0];
@@ -465,7 +496,7 @@ async function loadFrames() {
 // 	let selectedRepresentation = selectedAdaptation.representations[spatialLOD];
 // 	let currentRepresentation = selectedRepresentation; // Start with a default
 
-// 	let frameRate = 15;
+// 	let frameRate = 10;
 	
 // 	totalFrames = 300;
 
@@ -478,7 +509,7 @@ async function loadFrames() {
 // 	while(frameIndex < totalFrames) {
 //         const promises = [];
 
-// 		let LOD = 'LOD0';
+// 		let LOD = 'LOD1';
 // 		// let pointSize = 4;
 // 		let pointSize = currentRepresentation.pointSize;
 
@@ -501,9 +532,8 @@ async function loadFrames() {
 //             		if (now > latestDownloadEndTime) {
 //                 		latestDownloadEndTime = now;
 //             		}
-// 					const frameSize = buffer.byteLength;
-// 					totalBytesDownloaded += frameSize;
-// 					return loadModel(buffer, tempIndex, pointSize, frameSize);
+// 					totalBytesDownloaded += buffer.byteLength;
+// 					return loadModel(buffer, tempIndex, pointSize, label);
 // 				})
 // 				.catch(error => {
 // 					console.error(`Error fetching or decoding frame #${segmentIndex}:`, error);
@@ -523,33 +553,72 @@ async function loadFrames() {
 // 		const durationInMs = latestDownloadEndTime - startDownload;
 // 		const durationInSeconds = durationInMs / 1000;
 // 		calculatedBandwidth = (totalBytesDownloaded * 8) / durationInSeconds;
-// 		receivedData += totalBytesDownloaded;
 
+// 		console.log(`🧪 Calculated Bandwidth ${(calculatedBandwidth / 1000000).toFixed(2)} Mbps`);
 
-// 		let passedTime = performance.now() - startTime;
+// 		const timeNow = performance.now();
+				
+//     	if (getRemainingPlayBack() == 0) {
+//         	// Only count it as a "network stall" if we were supposed to be playing
+//         	if (isPlaying) {
+// 				const currentStall = timeNow - bufferEndTime;
+// 				totalStallDuration += currentStall;
+// 				stallCount++;
+// 				console.warn(`⚠️ Buffer Empty! Stalled for ${currentStall.toFixed(0)}ms`);
+// 				isRebuffering = true;
+// 				isPlaying = false; 
+// 			}
+//         	// Reset the timeline to NOW. We can't have buffer in the past.
+//         	bufferEndTime = timeNow; 
+//     	}
 
-// 		playbackLogsLoadFrames.push({
-// 			time: passedTime / 1000, 
-// 			requestedData: Math.round((totalBytesDownloaded / 1000000) * 100) / 100,
+// 		let currentGOFLength = 0;
+// 		if(currentPlayingGOF.frames?.length > 0)
+// 			currentGOFLength = currentPlayingGOF.frames.length - currentPlaybackFrame;
+// 		// 6. LOGGING & NEXT LOOP
+// 		playbackLogs.push({
+// 			time: Math.round(timeNow), 
+// 			remaingTimeBuffer: getRemainingPlayBack(),
+// 			actualBandwidth: calculatedBandwidth,
+// 			size: getPlaybackBufferSize(),
+// 			downloadedData: totalBytesDownloaded / 1000000,
+// 			GOFQueue: GOFQueue.length,
+// 			currentGOF: currentGOFLength, 
+// 			totalQuality: 0
 // 		});
-
+		
 // 		GOFQueue.push({frames: downloadedFrames, rate: frameRate, size: totalBytesDownloaded});
 // 		console.log(`🍷 GOF starting at frame ${frameIndex} loaded. Queue Size: ${GOFQueue.length} Segment Available`);
-// 		startPlayback();		
+// 		bufferEndTime = timeNow + getRemainingPlayBack() * 1000;
 		
-// 		if(frameIndex == 0 && loop == 0)
-// 			start = true;
-
+// 		// Check if the buffer has minimum play back if not add on the stalls 
+// 		const isLastGOF = (frameIndex + segmentSize >= totalFrames);
+// 		// 5. RESUME LOGIC (The "Wait" Logic)
+// 		// If we are stopped/rebuffering, check if we have enough data to start again
+// 		if (isRebuffering || !isPlaying) {
+// 			if (getRemainingPlayBack() >= minimumPlayback) {
+// 				console.log(`🚀 Buffer refilled to ${getRemainingPlayBack().toFixed(2)}s. Resuming Playback!`);
+// 				startPlayback(); 
+// 				isRebuffering = false;
+// 				bufferEndTime = performance.now() + getRemainingPlayBack() * 1000;
+// 			} else {
+// 				if(!isLastGOF)
+// 					console.log(`⏳ Buffering... ${getRemainingPlayBack().toFixed(2)}s / ${minimumPlayback}s`);
+// 				else
+// 				{
+// 					console.log(`Last GOF ... PLay Regardless`);
+// 					startPlayback();
+// 					isRebuffering = false;
+// 				}
+// 			}
+// 		}
+		
 // 		frameIndex += segmentSize;
-// 		maxLoop = 3;
+// 		maxLoop = 2;
 // 		if(frameIndex >= totalFrames && loop < maxLoop)
 // 		{
 // 			frameIndex = 0;
 // 			loop += 1;
-// 		}
-// 		else if(frameIndex >= totalFrames && loop == maxLoop)
-// 		{
-// 			loopFinished = true;
 // 		}
 //     }
 // }
@@ -571,7 +640,7 @@ function startPlayback() {
     }
 }
 
-function loadModel(buffer, index, pointSize, frameSize) {
+function loadModel(buffer, index, pointSize, label) {
     // Return a new Promise
     return new Promise((resolve, reject) => {
         const onLoad = (geometry) => {
@@ -604,7 +673,7 @@ function loadModel(buffer, index, pointSize, frameSize) {
 			dataMaterial.transparent = true;
 			
 			addDepth(dataMaterial, camera.near, camera.far);
-			resolve({ points: points, index: index + 1, size: Math.round((frameSize / 1000000) * 100) / 100 });
+			resolve({ points: points, index: index + 1 });
 		};
 		const onError = (error) => {
             console.error(`DracoLoader error for frame #${index}:`, error);
@@ -787,68 +856,15 @@ function removeMesh()
 
 let previousPlaybackFrame = 0;
 let frameIndex = 0;
-let stallTimeStart = 0;
-let stallTimeEnd = 0;
-let totalStallTime =-0;
-let stallCount = 0;
-let passedRenderingTime = 0;
-let underflow = false;
-
-let current = 0;
-let renderPrevious = 0;
-let statPrevious = 0;
-
-
-function getStats()
-{
-	const timeNow = performance.now();
-	let passedTime = timeNow - startTime;
-
-	playbackLogsRender.push({
-		time: passedTime / 1000,
-		bufferTime: Math.round(getRemainingPlayBack(true) * 100) / 100,
-		bufferSize: Math.round(getPlaybackBufferSize() * 100) / 100,
-		consumedData: Math.round(consumedData * 100) / 100,
-		receivedData: Math.round((receivedData / 1000000) * 100) / 100	
-	});
-}
 
 function render() {
 	
 	removeMesh();
-	
-	current = performance.now();
-	
-	if(start == false)
-		return;
 
-	if (getRemainingPlayBack() == 0 && underflow == false)
-	{
-		stallTimeStart = current;
-		underflow = true;
-	}
-	else if(getRemainingPlayBack() > 0 && underflow == true)
-	{
-		stallTimeEnd = current - stallTimeStart;
-		stallTimeEnd = stallTimeEnd / 1000;
-		totalStallTime += stallTimeEnd;
-		underflow = false;
-		stallCount += 1;
-	}
-	
-	let statInterval = current - statPrevious;
-	if((statInterval / 1000) > 0.5)
-	{
-		getStats();
-		statPrevious = current;
-	}
-
-	//Check if the currentGOF is playing
 	if (isPlaying && currentPlayingGOF.frames.length > 0) {
-		
-		let renderInterval = current - renderPrevious;
-		console.log(`🪭Frame Interval: ${renderInterval.toFixed(2)} ms, Current Frame ${frameIndex}, Current Angle ${currentAngle}`);
-		renderPrevious = current;
+        let current = performance.now();
+		console.log(`🪭Frame Interval: ${(current - previous).toFixed(2)} ms, Current Frame ${frameIndex}, Current Angle ${currentAngle}`);
+		previous = current;
 
 		// console.log(frameHoldCounter, frameHoldDuration);
 		if(frameIndex == 0 || currentPlaybackFrame != previousPlaybackFrame){ 
@@ -862,8 +878,6 @@ function render() {
         	// 2. Get the new frame object from our buffer
 			currentPoints =	currentPlayingGOF.frames[currentPlaybackFrame].points;
 			frameIndex = currentPlayingGOF.frames[currentPlaybackFrame].index;
-			consumedData += currentPlayingGOF.frames[currentPlaybackFrame].size;
-
 			// 3. Add the new frame object to the scene
 			scene.add(currentPoints);
 			console.log(`🖼️ Displaying Frame# ${frameIndex} with Angle ${currentAngle}`);
@@ -897,7 +911,7 @@ function render() {
 		// renderer.clear();
 		renderer.render(scene, camera);
 		// modify_pixels(frameIndex);
-		
+
 
 		if (frameHoldCounter >= frameHoldDuration) { // Move to the next frame
 			// Reset the counter for the *next* frame
@@ -914,45 +928,34 @@ function render() {
 			else
 				nextFrameIndex = frameIndex += 1;
 			
-			if (nextFrameIndex > totalFrames && loopFinished == true) {
+			if (nextFrameIndex > totalFrames && loop == maxLoop) {
 				endTime = performance.now(); // Record the end time
 				const totalTime = (endTime - startTime) / 1000; // Total time in seconds
 				const fps = totalFrames / totalTime; // Calculate FPS
 				console.log(`Total time to render ${totalFrames} frames: ${totalTime.toFixed(2)} seconds`);
 				console.log(`FPS: ${fps.toFixed(2)}`);
-								
-				const time1 = playbackLogsLoadFrames.map(entry => entry.time);
-				const actualBandwidth = playbackLogsLoadFrames.map(entry => entry.actualBandwidth);
-				const predictedBandwidth = playbackLogsLoadFrames.map(entry => entry.predictedBandwidth);
-				const requestedData = playbackLogsLoadFrames.map(entry => entry.requestedData);
-				const totalQuality = playbackLogsLoadFrames.map(entry => entry.totalQuality);
-
 				
-				console.log("Time", time1);
-				console.log("Actual", actualBandwidth);
+				// Extract just the buffer values for the Y-Axis
+				const bufferValues = playbackLogs.map(entry => entry.remaingTimeBuffer);
+				const timeStamps = playbackLogs.map(entry => entry.time);
+				const bandwidth = playbackLogs.map(entry => entry.actualBandwidth);
+				const predictedBandwidth = playbackLogs.map(entry => entry.predictedBandwidth);
+				const size = playbackLogs.map(entry => entry.size);
+				const GOFQueue = playbackLogs.map(entry => entry.GOFQueue);
+				const currentGOF = playbackLogs.map(entry => entry.currentGOF);
+				const downloadedData = playbackLogs.map(entry => entry.downloadedData);
+				const totalQuality = playbackLogs.map(entry => entry.totalQuality);
+
+				console.log("Buffer", bufferValues);
+				console.log("Time", timeStamps);
+				console.log("Actual", bandwidth);
 				console.log("Predicted", predictedBandwidth);
-				console.log("Total Bytes Requested", requestedData);
+				let rmse = getRMSE(bandwidth, predictedBandwidth)
+				console.log("RMSE", rmse / 1000000);
+				console.log("Size", size);
+				console.log("Total Bytes Downloaded", downloadedData);
 				console.log("Total Quality", totalQuality);
 				console.log("Average Quality", getAverage(totalQuality));
-
-				//Instead calcualate R^2 value
-				let rmse = getRMSE(actualBandwidth, predictedBandwidth)
-				console.log("RMSE", rmse / 1000000);
-
-				const time2 = playbackLogsRender.map(entry => entry.time);
-				const bufferTime = playbackLogsRender.map(entry => entry.bufferTime);
-				const bufferSize = playbackLogsRender.map(entry => entry.bufferSize);
-				const consumedData = playbackLogsRender.map(entry => entry.consumedData);
-				const receivedData = playbackLogsRender.map(entry => entry.receivedData);
-
-				console.log("Time", time2);
-				console.log("Size", bufferSize);
-				console.log("Buffer", bufferTime);
-				console.log("Received Data", receivedData);
-				console.log("Consumed Data", consumedData);
-				console.log("Stall Time", totalStallTime);
-				console.log("Stall Count", stallCount);
-				
 
 				const selectedTemporal = representationInfo.map(entry => entry.frameRate);
 				const selectedSpatial = representationInfo.map(entry => entry.LOD);
@@ -961,8 +964,6 @@ function render() {
 				// console.log("Current GOF", currentGOF);
 				console.log("Temporal", selectedTemporal);
 				console.log("Spatial", selectedSpatial);
-
-				start = false;
 			}
 			
 			if (currentPlaybackFrame >=	currentPlayingGOF.frames.length && isRebuffering == false) {

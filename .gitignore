@@ -1,14 +1,14 @@
-# Ignore specific folders 
-notUsed/
-asyncPCDLoader/
+# Dependencies
 node_modules/
 
-# Ignore specific files
-calculateHole(new).js
-calculateOverlap(new).js
-staticLoader.js
-staticLoader copy.js
-varyingPointSize(static).js
-simulation.js
-metafileDefense.xml
+# C++ / CMake Build outputs
+**/build/
+*.o
+*.obj
+*.exe
+a.out
+
+# OS & System
+.DS_Store
+Thumbs.db
 
