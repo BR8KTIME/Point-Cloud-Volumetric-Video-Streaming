@@ -1,4 +1,4 @@
-# Dependencies
+﻿# Dependencies
 node_modules/
 
 # C++ / CMake Build outputs
@@ -12,3 +12,11 @@ a.out
 .DS_Store
 Thumbs.db
 
+# Offline Research - Exclude everything except create_LoD
+offline_research/modules/
+offline_research/offline_experiments/
+offline_research/optimization_datasets/
+offline_research/testing_and_legacy/
+offline_research/*
+!offline_research/create_LoD/
+!offline_research/create_LoD/**
