@@ -20,7 +20,7 @@ Here are key ideas of this project:
 * Subdivides the single point cloud frame into numerous Level of Details (LoDs) such that it can be streamed under constrained network.
 * Provides optimal point size for each LoD considering the trade-off between the holes and the overlap areas. The calculation is done in the offline phase and provided in the metafile to the client.
 * Adopts 2D interpolation technique at the client side to detect occuring holes and conceal them to enhance the final visual quality.
-* **Spatial-Temporal Adaptive DASH Streaming & Buffer-Aware Scheduling**: Dynamically selects optimal spatial LoD (voxel density) and temporal LoD (frame rate) via an objective function. Utilizes a Group of Frames (GOF) buffer queue and margin-based adaptation to eliminate video playback stalls (rebuffering) under fluctuating network bandwidth.
+* Dynamically selects optimal spatial LoD(point density) and temporal LoD (frame rate) via an objective function. Utilizes a Group of Frames (GOF) buffer queue and margin-based adaptation to eliminate video playback stalls (rebuffering) under fluctuating network bandwidth.
 
 ### Repository Structure
 * **`src/`**: Real-time adaptive volumetric video streaming web client powered by MPEG-DASH, Three.js, and custom WebGL shaders (`stream.js`).
